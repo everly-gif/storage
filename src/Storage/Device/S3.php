@@ -88,7 +88,7 @@ class S3 extends Device
      * @var array
      */
     protected $headers = [
-        'host' => '', 'date' => '', 'content-md5' => '', 'content-type' => '',
+        'host' => '', 'date' => '', 'content-type' => '', 'X-Amz-User-Agent' => 'utopia-php/storage',
     ];
 
     /**
@@ -217,7 +217,7 @@ class S3 extends Device
     {
         $uri = $path !== '' ? '/' . \str_replace(['%2F', '%3F'], ['/', '?'], \rawurlencode($path)) : '/';
 
-        $this->headers['content-md5'] = \base64_encode(md5('', true));
+        //$this->headers['content-md5'] = \base64_encode(md5('', true));
         $this->headers['content-type'] = $contentType;
         $this->amzHeaders['x-amz-acl'] = $this->acl;
         $response = $this->call(self::METHOD_POST, $uri, '', ['uploads' => '']);
@@ -242,7 +242,7 @@ class S3 extends Device
         
         $data = \file_get_contents($source);
         $this->headers['content-type'] = \mime_content_type($source);
-        $this->headers['content-md5'] = \base64_encode(md5($data, true));
+        //$this->headers['content-md5'] = \base64_encode(md5($data, true));
         $this->amzHeaders['x-amz-content-sha256'] = \hash('sha256', $data);
         unset($this->amzHeaders['x-amz-acl']); // ACL header is not allowed in parts, only createMultipartUpload accepts this header.
 
@@ -276,7 +276,7 @@ class S3 extends Device
         $body .= '</CompleteMultipartUpload>';
 
         $this->amzHeaders['x-amz-content-sha256'] = \hash('sha256', $body);
-        $this->headers['content-md5'] = \base64_encode(md5($body, true));
+        //$this->headers['content-md5'] = \base64_encode(md5($body, true));
         $this->call(self::METHOD_POST, $uri, $body , ['uploadId' => $uploadId]);
         return true;
     }
@@ -295,7 +295,7 @@ class S3 extends Device
     {
         $uri = $path !== '' ? '/' . \str_replace(['%2F', '%3F'], ['/', '?'], \rawurlencode($path)) : '/';
         unset($this->headers['content-type']);
-        $this->headers['content-md5'] = \base64_encode(md5('', true));
+        //$this->headers['content-md5'] = \base64_encode(md5('', true));
         $this->call(self::METHOD_DELETE, $uri, '', ['uploadId' => $extra]);
         return true;
     }
@@ -314,7 +314,7 @@ class S3 extends Device
     public function read(string $path, int $offset = 0, int $length = null): string
     {
         unset($this->headers['content-type']);
-        $this->headers['content-md5'] = \base64_encode(md5('', true));
+        //$this->headers['content-md5'] = \base64_encode(md5('', true));
         $uri = ($path !== '') ? '/' . \str_replace('%2F', '/', \rawurlencode($path)) : '/';
         if($length !== null) {
             $end = $offset + $length - 1;
@@ -339,7 +339,7 @@ class S3 extends Device
         $uri = $path !== '' ? '/' . \str_replace(['%2F', '%3F'], ['/', '?'], \rawurlencode($path)) : '/';
         
         $this->headers['content-type'] = $contentType;
-        $this->headers['content-md5'] = \base64_encode(md5($data, true)); //TODO whould this work well with big file? can we skip it?
+        //$this->headers['content-md5'] = \base64_encode(md5($data, true)); //TODO whould this work well with big file? can we skip it?
         $this->amzHeaders['x-amz-content-sha256'] = \hash('sha256', $data);
         $this->amzHeaders['x-amz-acl'] = $this->acl;
 
@@ -387,7 +387,7 @@ class S3 extends Device
         $uri = ($path !== '') ? '/' . \str_replace('%2F', '/', \rawurlencode($path)) : '/';
         
         unset($this->headers['content-type']);
-        $this->headers['content-md5'] = \base64_encode(md5('', true));
+        //$this->headers['content-md5'] = \base64_encode(md5('', true));
         $this->call(self::METHOD_DELETE, $uri);
 
         return true;
@@ -406,7 +406,7 @@ class S3 extends Device
     {
         $uri = '/';
         $this->headers['content-type'] = 'text/plain';
-        $this->headers['content-md5'] = \base64_encode(md5('', true));
+        //$this->headers['content-md5'] = \base64_encode(md5('', true));
 
         $parameters = [
             'list-type' => 2,
@@ -452,7 +452,7 @@ class S3 extends Device
             $body .= '<Quiet>true</Quiet>';
             $body .= '</Delete>';
             $this->amzHeaders['x-amz-content-sha256'] = \hash('sha256', $body);
-            $this->headers['content-md5'] = \base64_encode(md5($body, true));
+            //$this->headers['content-md5'] = \base64_encode(md5($body, true));
             $this->call(self::METHOD_POST, $uri, $body, ['delete'=>'']);
         } while(!empty($continuationToken));
 
@@ -569,7 +569,7 @@ class S3 extends Device
     private function getInfo(string $path): array
     {
         unset($this->headers['content-type']);
-        $this->headers['content-md5'] = \base64_encode(md5('', true));
+        //$this->headers['content-md5'] = \base64_encode(md5('', true));
         $uri = $path !== '' ? '/' . \str_replace('%2F', '/', \rawurlencode($path)) : '/';
         $response = $this->call(self::METHOD_HEAD, $uri);
 
@@ -603,10 +603,12 @@ class S3 extends Device
             $combinedHeaders[\strtolower($k)] = \trim($v);
         }
 
-        uksort($combinedHeaders, [ & $this, 'sortMetaHeadersCmp']);
+        uksort($combinedHeaders, [  $this, 'sortMetaHeadersCmp']);
 
         // Convert null query string parameters to strings and sort
-        uksort($parameters, [ & $this, 'sortMetaHeadersCmp']);
+        uksort($parameters, [  $this, 'sortMetaHeadersCmp']);
+
+        var_dump($combinedHeaders);
         $queryString = \http_build_query($parameters, '', '&', PHP_QUERY_RFC3986);
 
         // Payload
@@ -671,7 +673,7 @@ class S3 extends Device
 
         // Basic setup
         $curl = \curl_init();
-        \curl_setopt($curl, CURLOPT_USERAGENT, 'utopia-php/storage');
+       // \curl_setopt($curl, CURLOPT_USERAGENT, 'utopia-php/storage');
         \curl_setopt($curl, CURLOPT_URL, $url);
 
         // Headers
@@ -739,6 +741,7 @@ class S3 extends Device
         
         $response->code = \curl_getinfo($curl, CURLINFO_HTTP_CODE);
         if ($response->code >= 400) {
+            //var_dump($httpHeaders);
             throw new Exception($response->body, $response->code);
         }
 
